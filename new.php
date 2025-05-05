@@ -30,10 +30,50 @@ $successMessage = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // stap 1: bekijk of waarde zijn ingevuld
-    // stap 2: datatypes omzetten en naar variabelen zetten
-    // stap 3: INSERT SQL query maken
-    // stap 4: execute query
-    // stap 5: success message
+    if (empty($_POST['name']) || empty($_POST['category_id']) || empty($_POST['price']) || !isset($_FILES['image'])) {
+        $errorMessage = "Vul alle verplichte velden in.";
+    } else {
+        // stap 2: datatypes omzetten en naar variabelen zetten
+        $name = trim($_POST['name']);
+        $category_id = (int)$_POST['category_id'];
+        $price = floatval($_POST['price']);
+
+        $image = $_FILES['image'];
+        $imagePath = '';
+        if ($image['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = 'img/plants/';
+            $imageName = basename($image['name']);
+            $targetFilePath = $uploadDir . $imageName;
+
+            if (move_uploaded_file($image['tmp_name'], $targetFilePath)) {
+                $imagePath = $imageName;
+            } else {
+                $errorMessage = "Fout bij het uploaden van de afbeelding.";
+            }
+        } else {
+            $errorMessage = "Geen afbeelding geüpload of er is een fout opgetreden.";
+        }
+
+        if (empty($errorMessage)) {
+            // stap 3: INSERT SQL query maken
+            $sql = "INSERT INTO plant (name, price, category_id, image) VALUES (:name, :price, :category_id, :image)";
+
+            // stap 4: execute query
+            $stmt = $pdo->prepare($sql);
+            try {
+                $stmt->execute([
+                    'name' => $name,
+                    'price' => $price,
+                    'category_id' => $category_id,
+                    'image' => $imagePath
+                ]);
+                // stap 5: success message
+                $successMessage = "Nieuwe plant succesvol toegevoegd!";
+            } catch (PDOException $e) {
+                $errorMessage = "Fout bij het toevoegen van de plant: " . $e->getMessage();
+            }
+        }
+    }
 }
 ?>
 
@@ -65,8 +105,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <main>
         <div class="container">
-
         <!-- Maak je form hier -->
+        <?php if ($errorMessage): ?>
+            <div class="error-message"><?php echo htmlspecialchars($errorMessage); ?></div>
+        <?php endif; ?>
+
+        <?php if ($successMessage): ?>
+            <div class="success-message"><?php echo htmlspecialchars($successMessage); ?></div>
+        <?php endif; ?>
+
+        <form method="post" action="new.php" enctype="multipart/form-data">
+            <label for="name">Plantnaam:</label><br>
+            <input type="text" id="name" name="name" required><br><br>
+
+            <label for="price">Prijs:</label><br>
+            <input type="number" step="0.01" id="price" name="price" required><br><br>
+
+            <label for="category_id">Categorie:</label><br>
+            <select id="category_id" name="category_id" required>
+                <option value="">Selecteer een categorie</option>
+                <?php foreach ($categories as $category): ?>
+                    <option value="<?php echo htmlspecialchars($category['id']); ?>">
+                        <?php echo htmlspecialchars($category['name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select><br><br>
+
+            <label for="image">Afbeelding:</label><br>
+            <input type="file" id="image" name="image" accept="image/*" required><br><br>
+
+            <button type="submit">Toevoegen</button>
+        </form>
         </div>
     </main>
     
